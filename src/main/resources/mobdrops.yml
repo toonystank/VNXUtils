@@ -1,0 +1,6 @@
+mobdrops:
+  ENDER_DRAGON:
+    dropChance: 100
+    dropAmount: 1
+    dropMaterial:
+      - ELYTRA

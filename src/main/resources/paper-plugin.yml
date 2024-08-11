@@ -1,0 +1,9 @@
+name: VNXUtils
+version: '1.0-SNAPSHOT'
+main: com.toonystank.vnxutils.VNXUtils
+api-version: '1.21'
+has-open-classloader: true
+dependencies:
+ server:
+  WorldGuard:
+   required: false
