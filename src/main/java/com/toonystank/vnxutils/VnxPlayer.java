@@ -34,6 +34,10 @@ public record VnxPlayer(String name, UUID uuid) {
         }
         return player;
     }
+    public Player getOnlinePlayer(boolean bypass) {
+        if (getOnlinePlayer() == null) throw new NullPointerException("Player is not online");
+        return getOnlinePlayer();
+    }
 
     public boolean isOnline() {
         if (getOnlinePlayer() == null) return false;

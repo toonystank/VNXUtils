@@ -6,6 +6,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
@@ -24,6 +25,7 @@ public class PlayerManager extends ConfigManger implements Listener {
         this.plugin = plugin;
         staticInstance = this;
         plugin.getServer().getPluginManager().registerEvents(this, plugin);
+        load();
     }
 
     @EventHandler
@@ -32,15 +34,13 @@ public class PlayerManager extends ConfigManger implements Listener {
         addPlayer(player, true);
     }
 
-    public void firstLoad() throws IOException {
-        if (getBoolean("firstload")) return;
-        Arrays.stream(plugin.getServer().getOfflinePlayers())
-                .map(VnxPlayer::new)
-                .forEach(player -> addPlayer(player, false));
-        set("firstload", true);
+    public void firstLoad() {
+        Arrays.stream(plugin.getServer().getOfflinePlayers()).forEach(offlinePlayer -> {
+            VnxPlayer player = new VnxPlayer(offlinePlayer);
+            addPlayer(player, false);
+        });
     }
-
-    public void load() throws IOException {
+    public void load() {
         firstLoad();
     }
 
@@ -83,6 +83,16 @@ public class PlayerManager extends ConfigManger implements Listener {
             }
             return null;
         });
+    }
+    public static @NotNull VnxPlayer getPlayer(Player player) {
+        if (player == null) throw new IllegalArgumentException("Player cannot be null");
+        if (playerUuidMap.containsKey(player.getUniqueId())) {
+            return playerUuidMap.get(player.getUniqueId());
+        }else {
+            VnxPlayer newPlayer = new VnxPlayer(player);
+            addPlayer(newPlayer, true);
+            return newPlayer;
+        }
     }
 
     private static Optional<VnxPlayer> getPlayerFromMaps(String name) {

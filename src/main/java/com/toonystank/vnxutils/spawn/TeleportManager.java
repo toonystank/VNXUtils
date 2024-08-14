@@ -1,31 +1,30 @@
 package com.toonystank.vnxutils.spawn;
 
-import com.toonystank.vnxutils.ConfigManger;
-import com.toonystank.vnxutils.MessageUtils;
-import com.toonystank.vnxutils.VNXUtils;
+import com.toonystank.vnxutils.*;
 import lombok.Getter;
 import org.bukkit.Location;
 import org.bukkit.World;
-import org.bukkit.entity.Player;
 
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 @Getter
 public class TeleportManager extends ConfigManger {
 
     private final VNXUtils vnxUtils;
     private Location spawnLocation;
+    private final SpawnLeaveProtection spawnLeaveProtection;
 
-    private final Map<Player,PlayerLocation> playerPlayerLocationMap = new HashMap<>();
+    private final Map<VnxPlayer,PlayerLocation> playerPlayerLocationMap = new HashMap<>();
 
     public TeleportManager(VNXUtils plugin) throws IOException {
         super(plugin, "teleport.yml", false, false);
         this.vnxUtils = plugin;
         loadPlayerData();
         loadSpawn();
-        SpawnLeaveProtection spawnLeaveProtection = new SpawnLeaveProtection(plugin,this);
+        spawnLeaveProtection = new SpawnLeaveProtection(plugin,this);
     }
 
     public void loadSpawn() {
@@ -51,7 +50,8 @@ public class TeleportManager extends ConfigManger {
             double y = getDouble("lastLocation." + key + ".y");
             double z = getDouble("lastLocation." + key + ".z");
             Location location = new Location(vnxUtils.getServer().getWorld(world), x, y, z);
-            playerPlayerLocationMap.put(vnxUtils.getServer().getPlayer(key), new PlayerLocation(location));
+            VnxPlayer player = PlayerManager.getPlayer(UUID.fromString(key));
+            playerPlayerLocationMap.put(player, new PlayerLocation(location));
         }
     }
 
@@ -67,30 +67,36 @@ public class TeleportManager extends ConfigManger {
         saveSpawnLocation(location.getWorld().getName(), location.getX(), location.getY(), location.getZ());
     }
 
-    public void setLastLocation(Player player, Location location) throws IOException {
+    public void setLastLocation(VnxPlayer player, Location location) throws IOException {
         playerPlayerLocationMap.put(player, new PlayerLocation(location));
-        set("lastLocation." + player.getUniqueId() + ".world", location.getWorld().getName());
-        set("lastLocation." + player.getUniqueId() + ".x", location.getX());
-        set("lastLocation." + player.getUniqueId() + ".y", location.getY());
-        set("lastLocation." + player.getUniqueId() + ".z", location.getZ());
+        set("lastLocation." + player.uuid() + ".world", location.getWorld().getName());
+        set("lastLocation." + player.uuid() + ".x", location.getX());
+        set("lastLocation." + player.uuid() + ".y", location.getY());
+        set("lastLocation." + player.uuid() + ".z", location.getZ());
+    }
+    public void removeLastLocation(VnxPlayer player) throws IOException {
+        playerPlayerLocationMap.remove(player);
+        set("lastLocation." + player.uuid(), null);
     }
 
-    public void teleportToLastLocation(Player sender) {
-        if (!playerPlayerLocationMap.containsKey(sender)) {
-            MessageUtils.sendMessage(sender, VNXUtils.staticInstance.mainConfig.getPrefix() + VNXUtils.staticInstance.mainConfig.getNoLastLocation());
+    public void teleportToLastLocation(VnxPlayer player) throws IOException {
+        if (!playerPlayerLocationMap.containsKey(player)) {
+            MessageUtils.sendMessage(player, VNXUtils.staticInstance.mainConfig.getPrefix() + VNXUtils.staticInstance.mainConfig.getNoLastLocation());
             return;
         }
-        PlayerLocation playerLocation = playerPlayerLocationMap.get(sender);
+        PlayerLocation playerLocation = playerPlayerLocationMap.get(player);
         if (playerLocation != null) {
-            sender.teleportAsync(playerLocation.location);
-            MessageUtils.sendMessage(sender, VNXUtils.staticInstance.mainConfig.getPrefix() + VNXUtils.staticInstance.mainConfig.getTeleportedToLastLocation());
+            removeLastLocation(player);
+            player.getOnlinePlayer().teleportAsync(playerLocation.location);
+            spawnLeaveProtection.playEffects(player,playerLocation.location);
+            MessageUtils.sendMessage(player, VNXUtils.staticInstance.mainConfig.getPrefix() + VNXUtils.staticInstance.mainConfig.getTeleportedToLastLocation());
         }
-        playerPlayerLocationMap.remove(sender);
     }
 
-    public void teleportToSpawn(Player player) throws IOException {
-        setLastLocation(player, player.getLocation());
-        player.teleportAsync(spawnLocation);
+    public void teleportToSpawn(VnxPlayer player) throws IOException {
+        setLastLocation(player, player.getOnlinePlayer().getLocation());
+        player.getOnlinePlayer().teleportAsync(spawnLocation);
+        spawnLeaveProtection.playEffects(player,spawnLocation);
         MessageUtils.sendMessage(player, VNXUtils.staticInstance.mainConfig.getPrefix() + VNXUtils.staticInstance.mainConfig.getTeleportedToSpawn());
     }
     public record PlayerLocation(Location location) {

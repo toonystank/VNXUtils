@@ -3,7 +3,9 @@ package com.toonystank.vnxutils.chat;
 import co.aikar.commands.BaseCommand;
 import co.aikar.commands.annotation.*;
 import com.toonystank.vnxutils.MessageUtils;
+import com.toonystank.vnxutils.PlayerManager;
 import com.toonystank.vnxutils.VNXUtils;
+import com.toonystank.vnxutils.VnxPlayer;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
@@ -60,7 +62,8 @@ public class AddProfaneCommand extends BaseCommand {
     @CommandPermission("vnxutils.spawn")
     public void onSpawn(Player sender) {
         try {
-            plugin.teleportManager.teleportToSpawn(sender);
+            VnxPlayer player = PlayerManager.getPlayer(sender);
+            plugin.teleportManager.teleportToSpawn(player);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -84,7 +87,50 @@ public class AddProfaneCommand extends BaseCommand {
     @Description("Teleport to the last location.")
     @CommandPermission("vnxutils.back")
     public void onBack(Player sender) {
-        plugin.teleportManager.teleportToLastLocation(sender);
+        VnxPlayer player = PlayerManager.getPlayer(sender.getUniqueId());
+        try {
+            plugin.teleportManager.teleportToLastLocation(player);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+    @Subcommand("isinspawnmode")
+    @CommandAlias("isinspawnmode")
+    @Description("Check if player did /spawn and did not do /back")
+    @CommandPermission("vnxutils.spawnstatus")
+    public void onSpawnStatus(Player player, String otherPlayer) {
+        VnxPlayer vnxPlayer = PlayerManager.getPlayer(otherPlayer);
+        if (plugin.teleportManager.getPlayerPlayerLocationMap().containsKey(vnxPlayer)) {
+            player.sendMessage(otherPlayer + " is in spawn mode.");
+        } else {
+            player.sendMessage(otherPlayer + " is not in spawn mode.");
+        }
+    }
+    @Subcommand("setlastlocation")
+    @CommandAlias("setlastlocation")
+    @Description("Set the last location.")
+    @CommandPermission("vnxutils.setlastlocation")
+    public void onSetLastLocation(Player sender) {
+        try {
+            VnxPlayer player = PlayerManager.getPlayer(sender);
+            plugin.teleportManager.setLastLocation(player, sender.getLocation());
+            sender.sendMessage("Last location set.");
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+    @Subcommand("removespawnmode")
+    @CommandAlias("removespawnmode")
+    @Description("Remove player from spawn mode.")
+    @CommandPermission("vnxutils.removespawnmode")
+    public void onRemoveSpawnMode(Player player, String otherPlayer) {
+        VnxPlayer vnxPlayer = PlayerManager.getPlayer(otherPlayer);
+        try {
+            plugin.teleportManager.removeLastLocation(vnxPlayer);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        player.sendMessage(otherPlayer + " removed from spawn mode.");
     }
 
 }

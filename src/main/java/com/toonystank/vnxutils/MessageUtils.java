@@ -74,7 +74,6 @@ public class MessageUtils {
         sendMessage((CommandSender) sender, message);
     }
     public static void sendMessage(CommandSender sender, String message) {
-        MessageUtils.toConsole(message  + "  sending to player " + sender );
         Component component = new MineDown(message).toComponent();
         component = component.decoration(TextDecoration.ITALIC, false);
         send(sender,component);
