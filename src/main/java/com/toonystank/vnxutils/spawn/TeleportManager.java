@@ -94,6 +94,14 @@ public class TeleportManager extends ConfigManger {
     }
 
     public void teleportToSpawn(VnxPlayer player) throws IOException {
+        if (spawnLocation == null) {
+            MessageUtils.sendMessage(player, VNXUtils.staticInstance.mainConfig.getPrefix() + "No spawn location set.");
+            return;
+        }
+        if (playerPlayerLocationMap.containsKey(player)) {
+            MessageUtils.sendMessage(player, VNXUtils.staticInstance.mainConfig.getPrefix() + "Your already at spawn. Use /back to return to your last location.");
+            return;
+        }
         setLastLocation(player, player.getOnlinePlayer().getLocation());
         player.getOnlinePlayer().teleportAsync(spawnLocation);
         spawnLeaveProtection.playEffects(player,spawnLocation);
