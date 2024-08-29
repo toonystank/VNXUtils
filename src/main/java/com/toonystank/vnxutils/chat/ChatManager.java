@@ -19,11 +19,13 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 public class ChatManager implements Listener, ChatRenderer {
 
     private final ChatModerationConfig chatModerationConfig;
     private final Map<UUID, Long> lastMessageTime;
+    private static final long MESSAGE_COOLDOWN = 2000;
 
     public ChatManager(VNXUtils plugin) throws IOException {
         this.chatModerationConfig = new ChatModerationConfig(plugin);
@@ -36,59 +38,61 @@ public class ChatManager implements Listener, ChatRenderer {
         UUID playerUUID = player.getUniqueId();
         long currentTime = System.currentTimeMillis();
 
-        if (lastMessageTime.containsKey(playerUUID)) {
-            long lastTime = lastMessageTime.get(playerUUID);
-            if (currentTime - lastTime < 2000) {
-                event.setCancelled(true);
-                player.sendMessage(Component.text("You must wait 2 seconds between messages."));
-                player.sendActionBar(Component.text("You must wait 2 seconds between messages."));
-                return;
-            }
+        if (isOnCooldown(playerUUID, currentTime)) {
+            event.setCancelled(true);
+            sendCooldownMessage(player);
+            return;
         }
 
         lastMessageTime.put(playerUUID, currentTime);
         event.renderer(this);
     }
 
+    private boolean isOnCooldown(UUID playerUUID, long currentTime) {
+        return lastMessageTime.containsKey(playerUUID) && currentTime - lastMessageTime.get(playerUUID) < MESSAGE_COOLDOWN;
+    }
+
+    private void sendCooldownMessage(Player player) {
+        Component cooldownMessage = Component.text("You must wait 2 seconds between messages.");
+        player.sendMessage(cooldownMessage);
+        player.sendActionBar(cooldownMessage);
+    }
+
     @Override
     public @NotNull Component render(@NotNull Player player, @NotNull Component sourceDisplayName, @NotNull Component message, @NotNull Audience audience) {
-        String stringMessage = PlainTextComponentSerializer.plainText().serialize(message);
-        String[] words = stringMessage.split("\\s+");
+        String messageText = PlainTextComponentSerializer.plainText().serialize(message);
         Set<String> profaneWords = chatModerationConfig.getProfaneWords();
-        String placeholderFormat = "{{PROFANE_WORD_%d}}";
-        for (int i = 0; i < words.length; i++) {
-            if (profaneWords.contains(words[i].toLowerCase())) {
-                MessageUtils.toConsole("Profane word detected: " + words[i] + " from " + player.getName());
-                words[i] = String.format(placeholderFormat, i);
-            }
-        }
-        String filteredMessage = String.join(" ", words);
+
+        String filteredMessage = filterProfanity(messageText, profaneWords);
         String chatFormat = VNXUtils.staticInstance.getMainConfig().getChatFormat();
+
+        return formatMessage(player, sourceDisplayName, filteredMessage, chatFormat);
+    }
+
+    private String filterProfanity(String message, Set<String> profaneWords) {
+        for (String profaneWord : profaneWords) {
+            String regex = "\\b" + Pattern.quote(profaneWord) + "\\b";
+            String replacement = "*".repeat(profaneWord.length());
+            message = message.replaceAll("(?i)" + regex, replacement);
+        }
+        return message;
+    }
+
+    private Component formatMessage(Player player, Component sourceDisplayName, String filteredMessage, String chatFormat) {
         if (chatFormat != null) {
-            if (chatFormat.contains("{player}")) {
-                chatFormat = chatFormat.replace("{player}", player.getName());
-            }
-            if (chatFormat.contains("{message}")) {
-                chatFormat = chatFormat.replace("{message}", filteredMessage);
-            }
-            String placeholderFormatted = PlaceholderAPI.setPlaceholders(player, chatFormat);
-            Component formattedMessage = MessageUtils.format(placeholderFormatted);
-            if (player.hasPermission("vnxutils.bypassprofanity")) {
+            chatFormat = replacePlaceholders(player, chatFormat, filteredMessage);
+            Component formattedMessage = MessageUtils.format(chatFormat);
+
+            if (!player.hasPermission("vnxutils.bypassprofanity")) {
                 return formattedMessage;
             }
-            for (int i = 0; i < words.length; i++) {
-                if (words[i].matches("\\{\\{PROFANE_WORD_\\d+}}")) {
-                    String placeholder = String.format(placeholderFormat, i);
-                    String replacement = "*".repeat(placeholder.length() - 2);
-                    TextReplacementConfig replacementConfig = TextReplacementConfig.builder()
-                            .matchLiteral(placeholder)
-                            .replacement(Component.text(replacement))
-                            .build();
-                    formattedMessage = formattedMessage.replaceText(replacementConfig);
-                }
-            }
-            return formattedMessage;
         }
         return Component.text("[").append(sourceDisplayName).append(Component.text("] ")).append(Component.text(filteredMessage));
+    }
+
+    private String replacePlaceholders(Player player, String chatFormat, String filteredMessage) {
+        chatFormat = chatFormat.replace("{player}", player.getName())
+                .replace("{message}", filteredMessage);
+        return PlaceholderAPI.setPlaceholders(player, chatFormat);
     }
 }
